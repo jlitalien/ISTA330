@@ -5,6 +5,7 @@ import Login from "./components/Login";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import Menu from "./components/Menu";
+import FederatedLogin from "./components/FederatedLogin";
 import { HashRouter, Routes, Route } from "react-router-dom";
 import { Container, Row, Col } from "react-bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -44,6 +45,16 @@ function App() {
             exact
             path="/login"
             element={<Login customerLoggedIn={customerLoggedInHandler} />}
+          ></Route>
+          <Route
+            exact
+            path="/google/:username/:name"
+            element={
+              <FederatedLogin
+                provider="google"
+                customerLoggedIn={customerLoggedInHandler}
+              />
+            }
           ></Route>
         </Routes>
         <Row>

@@ -2,6 +2,7 @@ let { store } = require("./data_access/store");
 const express = require("express");
 var passport = require("passport");
 var LocalStrategy = require("passport-local");
+const GoogleStrategy = require("passport-google-oauth2").Strategy;
 var session = require("express-session");
 var SQLiteStore = require("connect-sqlite3")(session);
 const e = require("express");
@@ -38,6 +39,32 @@ passport.use(
   })
 );
 
+passport.use(
+  new GoogleStrategy(
+    {
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: "http://localhost:4002/auth/google/callback",
+      passReqToCallback: true,
+    },
+    function(request, accessToken, refreshToken, profile, done) {
+      console.log("in Google strategy:");
+      store
+        .findOrCreateNonLocalCustomer(
+          profile.displayName,
+          profile.email,
+          profile.id,
+          profile.provider
+        )
+        .then((x) => done(null, x))
+        .catch((e) => {
+          console.log(e);
+          return done("Something went wrong.");
+        });
+    }
+  )
+);
+
 app.use(
   session({
     secret: "keyboard cat",
@@ -48,26 +75,26 @@ app.use(
 );
 app.use(passport.authenticate("session"));
 
-passport.serializeUser(function (user, cb) {
-  process.nextTick(function () {
+passport.serializeUser(function(user, cb) {
+  process.nextTick(function() {
     cb(null, { id: user.id, username: user.username });
   });
 });
 
-passport.deserializeUser(function (user, cb) {
-  process.nextTick(function () {
+passport.deserializeUser(function(user, cb) {
+  process.nextTick(function() {
     return cb(null, user);
   });
 });
 
-app.get("/", function (req, res) {
+app.get("/", function(req, res) {
   res.status(200).json({
     done: true,
     message: "Welcome to imagequiz backend API",
   });
 });
 
-app.get("/flowers", function (req, res) {
+app.get("/flowers", function(req, res) {
   store
     .getFlowers()
     .then((x) => {
@@ -82,7 +109,7 @@ app.get("/flowers", function (req, res) {
     });
 });
 
-app.get("/quiz/:id", function (req, res) {
+app.get("/quiz/:id", function(req, res) {
   if (!req.isAuthenticated()) {
     res.status(401).json({ done: false, message: "Please login first" });
   }
@@ -100,7 +127,7 @@ app.get("/quiz/:id", function (req, res) {
     });
 });
 
-app.get("/scores/:quiztaker/:quizid", function (req, res) {
+app.get("/scores/:quiztaker/:quizid", function(req, res) {
   store
     .getQuiz()
     .then((x) => {
@@ -153,7 +180,41 @@ app.get("/login/failed", (request, response) => {
   response.status(401).json({ done: false, message: "Credentials not valid" });
 });
 
-app.post("/logout", function (req, res) {
+app.get(
+  "/auth/google",
+  passport.authenticate("google", {
+    scope: ["email", "profile"],
+  })
+);
+
+app.get("auth/google/success", (request, response) => {
+  console.log(request.user);
+  response.redirect(
+    `http://localhost:4002/#/google/${request.user.username}/${request.user.name}`
+  );
+});
+
+app.get("auth/google/failure", (request, response) => {
+  response.redirect(`http://localhost:4002/#/google/failed`);
+});
+
+app.get("/isloggedin", (request, response) => {
+  if (request.isAuthenticated()) {
+    response.status(200).json({ done: true, result: true });
+  } else {
+    response.status(401).json({ done: false, result: false });
+  }
+});
+
+app.get(
+  "/auth/google/callback/",
+  passport.authenticate("google", {
+    successRedirect: "auth/google/success",
+    failureRedirect: "auth/google/failure",
+  })
+);
+
+app.post("/logout", function(req, res) {
   req.logout();
   res.json({ done: true, message: "Customer signout success" });
 });
@@ -162,7 +223,10 @@ app.post("/score", (req, res) => {
   var quizTaker = req.body.quizTaker;
   var id = req.body.quizId;
   var score = req.body.score;
-  var date = new Date().toJSON().slice(0, 10).replace(/-/g, "-");
+  var date = new Date()
+    .toJSON()
+    .slice(0, 10)
+    .replace(/-/g, "-");
   var time = new Date(0);
   time.setSeconds(45); // specify value for SECONDS here
   var timeString = time.toISOString().substr(11, 8);

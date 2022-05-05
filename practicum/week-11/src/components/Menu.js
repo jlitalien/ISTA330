@@ -22,6 +22,8 @@ const Menu = (props) => {
               <>
                 <Nav.Link href="#/register">Register</Nav.Link>
                 <Nav.Link href="#/login">Login</Nav.Link>
+                <Nav.Link href="#/auth/google">Sign In with Google</Nav.Link>
+
                 <Nav.Link href="#/" onClick={logout}>
                   Logout
                 </Nav.Link>
